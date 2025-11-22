@@ -93,6 +93,20 @@ def generate_todos(state: AgentState) -> AgentState:
 
     response = structured_llm.invoke(prompt)
 
+    # Print generated tasks
+    print("\n" + "=" * 50)
+    print("TO-DO LIST")
+    print("=" * 50)
+
+    for task in response.tasks:
+        print(f"[ ] {task.title} - {task.description}")
+
+    print("\nTo-Do list generated! Let's start working...")
+
+    print("\n" + "=" * 50)
+    print("WORKFLOW")
+    print("=" * 50)
+
     # Update state tasks and conversation history
     state["tasks"] = [
         {
@@ -134,7 +148,7 @@ def execute_task(state: AgentState) -> AgentState:
     
     # Add task to conversation history
     state["conversation_history"].append(f"Executing task #{current_task['id']}: {current_task['title']}")
-    print(f"Executing task #{current_task['id']}: {current_task['title']}")
+    print(f"\nTASK #{current_task['id']}: {current_task['title']}\n")
     
     # Initialize LLM with tools
     llm = ChatOpenAI(model="gpt-5-mini", temperature=0)
@@ -160,8 +174,10 @@ def execute_task(state: AgentState) -> AgentState:
             try:
                 result = tool_func.invoke(tool_args)
                 state["conversation_history"].append(f"Tool '{tool_name}' executed with arguments {tool_args}")
+                print(f"Tool '{tool_name}' executed with arguments {tool_args}")
                 current_task['result'] = str(result)
                 state["conversation_history"].append(f"Result: {current_task['result']}") # TODO: Update for case where result is None, for instance tool call creates a file. (Maybe they should all return strings)
+                print(f"Result: {current_task['result']}\n")
                 current_task['status'] = "complete"
             except Exception as e:
                 print(f"Tool execution failed: {e}") # TODO: Maybe this should be added to conversation history? 
@@ -169,6 +185,14 @@ def execute_task(state: AgentState) -> AgentState:
         else:
             print(f"Tool '{tool_name}' not found in AVAILABLE_TOOLS")
             task_failed = True
+
+    # No tool calls made
+    else:
+        result = response.content
+        state["conversation_history"].append(f"LLM Response: {result}")
+        print(f"LLM Response: {result}\n")
+        current_task['status'] = "complete"
+
 
     if task_failed:
         current_task['status'] = "failed" # TODO: Involve human-in-the-loop
@@ -188,8 +212,6 @@ def reflect_and_complete(state: AgentState) -> AgentState:
 
     response = llm.invoke(final_output_prompt)
     state["output"] = response.content
-
-    print(state["output"])
 
     return state
 
