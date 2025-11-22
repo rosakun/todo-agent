@@ -1,5 +1,6 @@
 from typing import TypedDict, Literal
 from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
@@ -191,5 +192,85 @@ def reflect_and_complete(state: AgentState) -> AgentState:
     print(state["output"])
 
     return state
+
+
+
+
+""" Conditional routing function """
+
+def has_more_tasks(state: AgentState) -> str:
+    """
+    Check if there are more pending tasks to execute.
+    
+    Returns:
+        "execute" if there are pending tasks, "end" otherwise
+    """
+    if state["tasks"] is not None:
+        for task in state["tasks"]:
+            if task["status"] == "pending":
+                return "execute"
+    return "end"
+
+
+
+
+""" Graph construction """
+
+def create_agent_graph():
+    """
+    Create and compile the agent workflow graph.
+    
+    The graph consists of the following nodes:
+    - generate_todos: Generate task list from user goal
+    - select_next_task: Select the next pending task
+    - execute_task: Execute the current task using LLM with tools
+    - reflect_and_complete: Generate final summary after all tasks are done
+    
+    Returns:
+        Compiled LangGraph application ready for execution
+    """
+    
+    # Initialize StateGraph with AgentState schema
+    workflow = StateGraph(AgentState)
+    
+    # Add nodes to the graph
+    workflow.add_node("generate_todos", generate_todos)
+    workflow.add_node("select_next_task", select_next_task)
+    workflow.add_node("execute_task", execute_task)
+    workflow.add_node("reflect_and_complete", reflect_and_complete)
+    
+    # Set entry point
+    workflow.set_entry_point("generate_todos")
+    
+    # After generating todos, select the first task
+    workflow.add_edge("generate_todos", "select_next_task")
+
+    # After selecting a task, execute it
+    workflow.add_edge("select_next_task", "execute_task")
+    
+    # After executing a task, check if there are more tasks to execute.
+    # If there are, select next task.
+    # If there aren't, reflect and complete.
+    workflow.add_conditional_edges(
+        "execute_task",
+        has_more_tasks,
+        {
+            "execute": "select_next_task",
+            "end": "reflect_and_complete"
+        }
+    )
+
+    # After reflection, end the workflow
+    workflow.add_edge("reflect_and_complete", END)
+    
+    # Compile the graph with memory for state persistence
+    memory = MemorySaver()
+    app = workflow.compile(checkpointer=memory)
+    
+    return app
+
+
+
+
 
 

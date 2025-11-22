@@ -123,6 +123,62 @@ def test_reflect_and_complete_node(state: AgentState | None = None):
         print(f"test_reflect_and_complete_node exception: {e}")
 
 
+""" Test graph compilation """
+
+def test_graph_compilation():
+    """
+    Test whether the agent workflow graph compiles correctly.
+    
+    Checks:
+    - Graph compiles without errors
+    - Graph has the expected nodes
+    - Graph has the correct entry point
+    - Graph structure is valid
+    
+    Returns:
+        True if all checks pass, False otherwise
+    """
+    try:
+        # Attempt to create and compile the graph
+        app = create_agent_graph()
+        
+        # Check that the app was created
+        assert app is not None, "Graph compilation returned None"
+        print("Graph compiled successfully")
+        
+        # Get the graph structure
+        graph = app.get_graph()
+        
+        # Check that nodes exist
+        nodes = graph.nodes
+        expected_nodes = {"generate_todos", "select_next_task", "execute_task", "reflect_and_complete", "__start__", "__end__"}
+        node_keys = set(nodes.keys())
+        
+        assert expected_nodes.issubset(node_keys), f"Missing nodes. Expected {expected_nodes}, got {node_keys}"
+        print(f"All expected nodes present: {expected_nodes}")
+        
+        # Check that edges exist
+        edges = graph.edges
+        assert len(edges) > 0, "No edges found in graph"
+        print(f"Graph has {len(edges)} edges")
+        
+        # Verify the graph has a valid entry point
+        assert "__start__" in node_keys, "Graph missing __start__ node"
+        print("Graph has valid entry point")
+        
+        print("test_graph_compilation PASSED - Graph structure is valid")
+        return True
+        
+    except AssertionError as e:
+        print(f"test_graph_compilation FAILED: {e}")
+        return False
+    except Exception as e:
+        print(f"test_graph_compilation EXCEPTION: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 if __name__ == '__main__':
     state_1 = {'goal': 'Calculate 2 + 2 * 5', 'mode': 'auto', 
     'tasks': [{'id': 1, 'title': 'Multiply 2 and 5', 'description': 'Multiply 2 and 5 to get an intermediate result.', 'status': 'pending', 'result': None}, 
@@ -133,5 +189,5 @@ if __name__ == '__main__':
     'tasks': [{'id': 1, 'title': 'Multiply 2 and 5', 'description': 'Multiply 2 and 5 to get an intermediate result.', 'status': 'complete', 'result': "multiply({'a': 2, 'b': 5}) = 10"}, 
               {'id': 2, 'title': 'Add 2 to the result', 'description': 'Add 2 to the intermediate result to get the final answer.', 'status': 'pending', 'result': None}], 
               'current_task_id': 2, 'approved': False, 'user_action': None, 'conversation_history': ['Executing task #1: Multiply 2 and 5', "Tool 'multiply' executed with arguments {'a': 2, 'b': 5}", 'Result: 10']}
-    test_reflect_and_complete_node()
+    test_graph_compilation()
     
