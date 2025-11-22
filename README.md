@@ -1,4 +1,4 @@
-# agent-todo-executor
+# todo-agent
 Helpful AI Agent that listens to your goal, produces a to-do list, and then executes that to-do list.
 
 ## Install dependencies
