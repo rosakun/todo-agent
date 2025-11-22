@@ -86,10 +86,10 @@ def generate_todos(state: AgentState) -> AgentState:
     structured_llm = llm.with_structured_output(TodoListSchema)
     
     # LLM prompt
-    prompt = f"""Break down this goal into 3-7 actionable tasks:
+    prompt = f"""Write a to-do list towards reaching this goal by breaking it down into 3-7 actionable tasks:
     Goal: {state['goal']}
     
-    Each task should be concrete and executable."""
+    Each task should be concrete and executable. Do not overcomplicate the tasks."""
 
     response = structured_llm.invoke(prompt)
 
