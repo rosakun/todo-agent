@@ -101,11 +101,10 @@ def generate_todos(state: AgentState) -> AgentState:
     for task in response.tasks:
         print(f"[ ] {task.title} - {task.description}")
 
-    print("\nTo-Do list generated! Let's start working...")
+    
+    if state['mode'] == "auto":
+        print("\nLet's get to work. Starting execution...")
 
-    print("\n" + "=" * 50)
-    print("WORKFLOW")
-    print("=" * 50)
 
     # Update state tasks and conversation history
     state["tasks"] = [
@@ -200,6 +199,28 @@ def execute_task(state: AgentState) -> AgentState:
     return state
 
 
+def display_and_wait_for_approval(state: AgentState) -> AgentState:
+    """
+    Display the generated TO-DO list and wait for user approval.
+    This node is only used in 'confirm' mode.
+    """
+    print("\n" + "=" * 50)
+    print("\nDo you approve this task list?")
+    print("  [y] Yes - Start execution")
+    print("  [n] No - Cancel")
+    
+    choice = input("\nYour choice: ").strip().lower()
+    
+    if choice == 'y' or choice == 'yes':
+        state["approved"] = True
+        print("\n Task list approved. Starting execution...\n")
+    else:
+        state["approved"] = False
+        print("\n Task list rejected. Exiting...")
+    
+    return state
+
+
 def reflect_and_complete(state: AgentState) -> AgentState:
     """ Mark the agent as having completed all tasks. """
 
@@ -218,7 +239,31 @@ def reflect_and_complete(state: AgentState) -> AgentState:
 
 
 
-""" Conditional routing function """
+""" Conditional routing functions """
+
+def should_wait_for_approval(state: AgentState) -> str:
+    """
+    Check if we need to wait for user approval based on mode.
+    
+    Returns:
+        "wait" if in confirm mode, "execute" if in auto mode
+    """
+    if state["mode"] == "confirm":
+        return "wait"
+    return "execute"
+
+
+def is_approved(state: AgentState) -> str:
+    """
+    Check if the user approved the task list.
+    
+    Returns:
+        "execute" if approved, "end" if not approved
+    """
+    if state["approved"]:
+        return "execute"
+    return "end"
+
 
 def has_more_tasks(state: AgentState) -> str:
     """
@@ -257,6 +302,7 @@ def create_agent_graph():
     
     # Add nodes to the graph
     workflow.add_node("generate_todos", generate_todos)
+    workflow.add_node("display_and_wait_for_approval", display_and_wait_for_approval)
     workflow.add_node("select_next_task", select_next_task)
     workflow.add_node("execute_task", execute_task)
     workflow.add_node("reflect_and_complete", reflect_and_complete)
@@ -264,8 +310,25 @@ def create_agent_graph():
     # Set entry point
     workflow.set_entry_point("generate_todos")
     
-    # After generating todos, select the first task
-    workflow.add_edge("generate_todos", "select_next_task")
+    # After generating todos, check if we need approval
+    workflow.add_conditional_edges(
+        "generate_todos",
+        should_wait_for_approval,
+        {
+            "wait": "display_and_wait_for_approval",
+            "execute": "select_next_task"
+        }
+    )
+    
+    # After waiting for approval, check if approved
+    workflow.add_conditional_edges(
+        "display_and_wait_for_approval",
+        is_approved,
+        {
+            "execute": "select_next_task",
+            "end": END
+        }
+    )
 
     # After selecting a task, execute it
     workflow.add_edge("select_next_task", "execute_task")

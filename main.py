@@ -10,8 +10,17 @@ def main():
         return
     
     # Get user's goal
-    print("🤖 AI Agent TODO Executor")
+    print("+ AI Agent TODO Executor +")
     print("=" * 50)
+    
+    # Ask for mode
+    print("\nSelect mode:")
+    print("  [1] Auto - Execute tasks automatically")
+    print("  [2] Confirm - Review tasks before execution")
+    mode_choice = input("\nYour choice (default: 1): ").strip()
+    
+    mode = "confirm" if mode_choice == "2" else "auto"
+    
     goal = input("\nWhat would you like me to help you with? ").strip()
     
     if not goal:
@@ -24,10 +33,10 @@ def main():
     # Initialize state
     initial_state = {
         "goal": goal,
-        "mode": "auto",
+        "mode": mode,
         "tasks": None,
         "current_task_id": None,
-        "approved": True,
+        "approved": (mode == "auto"),  # Auto mode is pre-approved
         "user_action": None,
         "conversation_history": [],
         "output": None
