@@ -140,8 +140,6 @@ def execute_task(state: AgentState) -> AgentState:
     """ 
     Execute the current task using available tools.
     """
-
-    task_failed = False # Keeps track of whether the task has failed at some point
       
     # TODO: Handle cases where current_task_id is None or current_task is None
 
@@ -164,7 +162,7 @@ def execute_task(state: AgentState) -> AgentState:
     
     Use the available tools as needed to complete the task.
     Do not create files unless absolutely necessary.
-    Put all created files in a 'agent-files/' directory."""
+    Put all created files in an 'agent-files/' directory."""
     
     response = llm_with_tools.invoke(task_prompt)
 
@@ -227,6 +225,33 @@ def display_and_wait_for_approval(state: AgentState) -> AgentState:
         state["approved"] = False
         print("\n Task list rejected. Exiting...")
     
+    return state
+
+
+def reflect(state: AgentState) -> AgentState:
+    """ Reflect on the output of a task and decide on the task's status """
+    llm = ChatOpenAI(model="gpt-5-mini", temperature=0)
+
+    reflection_prompt = f"""Reflect on the result of the recently completed task titled '{state['tasks'][state['current_task_id']]['title']}'.
+    Based on the result: {state['tasks'][state['current_task_id']]['result']}, determine if the task was successful, failed, or needs follow-up.
+    Provide a brief explanation for your decision."""
+
+    response = llm.invoke(reflection_prompt)
+    reflection = response.content
+
+    # Simple heuristic to determine status based on reflection
+    if "successful" in reflection.lower():
+        state['tasks'][state['current_task_id']]['status'] = "complete"
+    elif "failed" in reflection.lower():
+        state['tasks'][state['current_task_id']]['status'] = "failed"
+    elif "follow-up" in reflection.lower():
+        state['tasks'][state['current_task_id']]['status'] = "needs-follow-up"
+    else:
+        state['tasks'][state['current_task_id']]['status'] = "needs-follow-up"  # Default to complete if unclear
+
+    state['tasks'][state['current_task_id']]['reflection'] = reflection
+    state["conversation_history"].append(f"Reflection on task #{state['current_task_id']}: {reflection}")
+
     return state
 
 
