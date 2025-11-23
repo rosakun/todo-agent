@@ -20,11 +20,18 @@ and executes tasks autonomously or with user confirmation.
 
 Key Components:
 - Task and AgentState: TypedDict schemas for state management. AgentState is the main state object, Task is a single task in the todo list.
-- Node functions: generate_todos
-- Graph construction
+- Node functions: 
+    - generate_todos() generates the to-do list based on the user query.
+    - display_and_wait_for_approval() shows the todo list in the terminal and waits for user approval in confirm mode.
+    - select_next_task() selects the next pending task from the todo list.
+    - execute_task() executes the selected task using an LLM with access to defined tools.
+    - reflect() reflects on the task result and updates its status.
+    - reflect_and_complete() generates a final summary output after all tasks are done.
+- Graph construction: create_agent_graph() builds the workflow graph with nodes and conditional edges.
 
-Usage: TODO
 """
+
+
 
 
 """ Agent states and LLM output schemas """
@@ -64,7 +71,6 @@ class AgentState(TypedDict):
     tasks: list[Task] | None
     current_task_id: int | None
     approved: bool
-    user_action: str | None  # approve, edit, regenerate, cancel
     conversation_history: list[str]  # Memory across tasks
     output: str | None  # Final output after all tasks are done
 
@@ -86,11 +92,12 @@ def generate_todos(state: AgentState) -> AgentState:
     structured_llm = llm.with_structured_output(TodoListSchema)
     
     # LLM prompt
-    prompt = f"""Create a to-do list for this goal by breaking it down, step-by-step, into no more than 10 actionable tasks:
+    prompt = f"""Create the simplest possible to-do list for this goal by breaking it down into 3-7 simple, actionable tasks:
     Goal: {state['goal']}
     
-    Each task should represent a single step.
-    Each task should be concrete and executable.
+    Each task should represent a single, simple step.
+    Each task should be achievable using only simple file operation tools: 'read file', 'write to file', 'append to file' or simple web search.
+    
     Avoid steps such as 'record', 'confirm', or 'reflect' unless absolutely necessary.
     """
 
@@ -126,86 +133,6 @@ def generate_todos(state: AgentState) -> AgentState:
     return state
 
 
-def select_next_task(state: AgentState) -> AgentState:
-    """ Find and select the next pending task. First pending task is selected. """
-
-    if state["tasks"] is not None: # TODO: Handle case where tasks is None
-        for task in state["tasks"]:
-            if task["status"] == "pending":
-                state["current_task_id"] = task["id"]
-                return state
-
-
-def execute_task(state: AgentState) -> AgentState:
-    """ 
-    Execute the current task using available tools.
-    """
-      
-    # TODO: Handle cases where current_task_id is None or current_task is None
-
-    # Get next task 
-    current_task = next((t for t in state["tasks"] if t["id"] == state["current_task_id"]), None)
-    
-    # Add task to conversation history
-    state["conversation_history"].append(f"Executing task #{current_task['id']}: {current_task['title']}")
-    print(f"\nTASK #{current_task['id']}: {current_task['title']}\n")
-    
-    # Initialize LLM with tools
-    llm = ChatOpenAI(model="gpt-5-mini", temperature=0)
-    llm_with_tools = llm.bind_tools(AVAILABLE_TOOLS)
-    
-    # Create LLM prompt
-    task_prompt = f"""Execute this task:
-    Title: {current_task['title']}
-    Description: {current_task['description']}
-    Context: {state['conversation_history']}
-    
-    Use the available tools as needed to complete the task.
-    Do not create files unless absolutely necessary.
-    Put all created files in an 'agent-files/' directory."""
-    
-    response = llm_with_tools.invoke(task_prompt)
-
-    if response.tool_calls:
-        tool_call = response.tool_calls[0] # TODO: Extend to case where you have multiple tool calls
-        tool_name = tool_call['name']
-        tool_args = tool_call['args']
-        
-        tool_func = next((t for t in AVAILABLE_TOOLS if t.name == tool_name), None)
-        if tool_func:
-            try:
-                result = tool_func.invoke(tool_args)
-                if tool_args > 100:
-                    state["conversation_history"].append(f"Tool '{tool_name}' executed.")
-                    print(f"Tool '{tool_name}' executed.\n")
-                else:
-                    state["conversation_history"].append(f"Tool '{tool_name}' executed with arguments {tool_args}")
-                    print(f"Tool '{tool_name}' executed with arguments {tool_args}")
-                current_task['result'] = str(result)
-                state["conversation_history"].append(f"Result: {current_task['result']}") # TODO: Update for case where result is None, for instance tool call creates a file. (Maybe they should all return strings)
-                print(f"Result: {current_task['result']}\n")
-                current_task['status'] = "complete"
-            except Exception as e:
-                print(f"Tool {tool_name}execution failed: {e}") # TODO: Maybe this should be added to conversation history? 
-                task_failed = True
-        else:
-            print(f"Tool '{tool_name}' not found in AVAILABLE_TOOLS")
-            task_failed = True
-
-    # No tool calls made
-    else:
-        result = response.content
-        state["conversation_history"].append(f"LLM Response: {result}")
-        print(f"LLM Response: {result}\n")
-        current_task['status'] = "complete"
-
-
-    if task_failed:
-        current_task['status'] = "failed" # TODO: Involve human-in-the-loop
-
-    return state
-
-
 def display_and_wait_for_approval(state: AgentState) -> AgentState:
     """
     Display the generated TO-DO list and wait for user approval.
@@ -228,37 +155,162 @@ def display_and_wait_for_approval(state: AgentState) -> AgentState:
     return state
 
 
+def select_next_task(state: AgentState) -> AgentState:
+    """ Find and select the next pending task. First pending task is selected. """
+
+    if state["tasks"] is not None:
+        for task in state["tasks"]:
+            if task["status"] == "pending":
+                state["current_task_id"] = task["id"]
+                return state
+    
+    # No pending tasks found - clear current_task_id
+    state["current_task_id"] = None
+    return state
+
+
+def execute_task(state: AgentState) -> AgentState:
+    """ 
+    Execute the current task using available tools.
+    Logs result in conversation history.
+    """
+      
+    # Get next task 
+    current_task = next((t for t in state["tasks"] if t["id"] == state["current_task_id"]), None)
+    
+    # Add task to conversation history
+    state["conversation_history"].append(f"Executing task #{current_task['id']}: {current_task['title']}")
+    print(f"\nTASK #{current_task['id']}: {current_task['title']}\n")
+    
+    # Initialize LLM with tools
+    llm = ChatOpenAI(model="gpt-5-mini", temperature=0)
+    llm_with_tools = llm.bind_tools(AVAILABLE_TOOLS)
+    
+    # Create LLM prompt
+    task_prompt = f"""Execute this task described with the title and description:
+    Title: {current_task['title']}
+    Description: {current_task['description']}
+    Context: {state['conversation_history']}
+    
+    Focus on the current task. If any tasks failed previously, do not try to solve them.
+    Use the available tools as needed to complete the task.
+    Do not create files unless absolutely necessary.
+    Put all created files in an 'agent-files/' directory."""
+    
+    response = llm_with_tools.invoke(task_prompt)
+
+    if response.tool_calls:
+        current_task['result'] = ''  # Initialize result once before processing all tool calls
+        
+        for tool_call in response.tool_calls:
+            tool_name = tool_call['name']
+            tool_args = tool_call['args']
+        
+            tool_func = next((t for t in AVAILABLE_TOOLS if t.name == tool_name), None)
+            if tool_func:
+                try:
+                    result = tool_func.invoke(tool_args)
+                    # Check if tool_args string representation is too long to log
+                    if len(str(tool_args)) > 100: # Avoid logging large content in conversation history
+                        state["conversation_history"].append(f"Tool '{tool_name}' executed.")
+                        print(f"Tool '{tool_name}' executed.\n")
+                    else:
+                        state["conversation_history"].append(f"Tool '{tool_name}' executed with arguments {tool_args}")
+                        print(f"Tool '{tool_name}' executed with arguments {tool_args}")
+                    current_task['result'] += str(result)
+                    state["conversation_history"].append(f"Result: {current_task['result']}") # TODO: Update for case where result is None, for instance tool call creates a file. (Maybe they should all return strings)
+                    print(f"Result: {current_task['result']}\n")
+                except Exception as e:
+                    current_task['result'] += f"Tool execution failed: {e}"
+                    state["conversation_history"].append(f"Tool {tool_name}execution failed: {e}")
+                    print(f"Tool {tool_name} execution failed: {e}") # TODO: Maybe this should be added to conversation history? 
+
+            else:
+                current_task['result'] += f"Tool '{tool_name}' not found"
+                state["conversation_history"].append(f"Tool '{tool_name}' not found in AVAILABLE_TOOLS")
+                print(f"Tool '{tool_name}' not found in AVAILABLE_TOOLS")
+
+    # No tool calls made
+    else:
+        result = response.content
+        current_task['result'] = result
+        state["conversation_history"].append(f"LLM Response: {result}")
+        print(f"LLM Response: {result}\n")
+
+    return state
+
+
+
 def reflect(state: AgentState) -> AgentState:
-    """ Reflect on the output of a task and decide on the task's status """
+    """ 
+    Reflect on the output of a task and decide on the task's status 
+    TODO: Involve human-in-the-loop when LLM deems it necessary
+    """
+    # Get the current task by ID
+    current_task = next((t for t in state["tasks"] if t["id"] == state["current_task_id"]), None)
+    
+    if not current_task:
+        print(f"Error: Could not find task with ID {state['current_task_id']}")
+        return state
+    
     llm = ChatOpenAI(model="gpt-5-mini", temperature=0)
 
-    reflection_prompt = f"""Reflect on the result of the recently completed task titled '{state['tasks'][state['current_task_id']]['title']}'.
-    Based on the result: {state['tasks'][state['current_task_id']]['result']}, determine if the task was successful, failed, or needs follow-up.
-    Provide a brief explanation for your decision."""
+    reflection_prompt = f"""Summarize the result of the recently completed task titled '{current_task['title']}'.
+    Based on the result, choose one label for the task: "successful", "failed", or "needs follow-up".
+    In no more than three sentences, briefly explain your decision. Be concise.
+    This is the result: {current_task['result']}
+    """
 
     response = llm.invoke(reflection_prompt)
     reflection = response.content
 
-    # Simple heuristic to determine status based on reflection
-    if "successful" in reflection.lower():
-        state['tasks'][state['current_task_id']]['status'] = "complete"
-    elif "failed" in reflection.lower():
-        state['tasks'][state['current_task_id']]['status'] = "failed"
-    elif "follow-up" in reflection.lower():
-        state['tasks'][state['current_task_id']]['status'] = "needs-follow-up"
+    # Determine status based on which keyword appears first in the reflection
+    reflection_lower = reflection.lower()
+    
+    # Find positions of each keyword (returns -1 if not found)
+    pos_successful = reflection_lower.find("successful")
+    pos_success = reflection_lower.find("success")
+    pos_failed = reflection_lower.find("failed")
+    pos_follow_up = reflection_lower.find("follow-up")
+    
+    # Get the earliest success-related position
+    success_positions = [p for p in [pos_successful, pos_success] if p != -1]
+    earliest_success = min(success_positions) if success_positions else float('inf')
+    
+    # Get the earliest position among all keywords
+    positions = {
+        'complete': earliest_success,
+        'failed': pos_failed if pos_failed != -1 else float('inf'),
+        'needs-follow-up': pos_follow_up if pos_follow_up != -1 else float('inf')
+    }
+    
+    # Find which keyword appears first
+    first_status = min(positions.items(), key=lambda x: x[1])
+    
+    if first_status[1] != float('inf'):
+        current_task['status'] = first_status[0]
     else:
-        state['tasks'][state['current_task_id']]['status'] = "needs-follow-up"  # Default to complete if unclear
+        current_task['status'] = "complete"  # Default to complete if no keywords found
 
-    state['tasks'][state['current_task_id']]['reflection'] = reflection
-    state["conversation_history"].append(f"Reflection on task #{state['current_task_id']}: {reflection}")
+    current_task['reflection'] = reflection
+    state["conversation_history"].append(f"Reflection on task #{state['current_task_id']}: {reflection}. Task marked as {current_task['status']}.")
+    print(f"Reflection: {reflection}")
+    print(f"✓ Task #{state['current_task_id']} marked as: {current_task['status']}\n")
+    
+    # Debug: show all task statuses
+    print("Current task statuses:")
+    for task in state["tasks"]:
+        status_icon = "✓" if task["status"] == "complete" else "." if task["status"] == "pending" else "✗"
+        print(f"  {status_icon} Task {task['id']}: {task['status']}")
+    print()
+    
+    return state 
 
-    return state
 
 
 def reflect_and_complete(state: AgentState) -> AgentState:
     """ Mark the agent as having completed all tasks. """
 
-    
     llm = ChatOpenAI(model="gpt-5-mini", temperature=0)
 
     final_output_prompt = f"""The agent has completed all tasks for the goal: {state['goal']}.
@@ -269,6 +321,7 @@ def reflect_and_complete(state: AgentState) -> AgentState:
     state["output"] = response.content
 
     return state
+
 
 
 
@@ -306,9 +359,12 @@ def has_more_tasks(state: AgentState) -> str:
         "execute" if there are pending tasks, "end" otherwise
     """
     if state["tasks"] is not None:
-        for task in state["tasks"]:
-            if task["status"] == "pending":
-                return "execute"
+        pending_count = sum(1 for task in state["tasks"] if task["status"] == "pending")
+        if pending_count > 0:
+            print(f"→ {pending_count} pending task(s) remaining")
+            return "execute"
+    
+    print("→ No more pending tasks. Moving to completion.")
     return "end"
 
 
@@ -338,6 +394,7 @@ def create_agent_graph():
     workflow.add_node("display_and_wait_for_approval", display_and_wait_for_approval)
     workflow.add_node("select_next_task", select_next_task)
     workflow.add_node("execute_task", execute_task)
+    workflow.add_node("reflect", reflect)
     workflow.add_node("reflect_and_complete", reflect_and_complete)
     
     # Set entry point
@@ -365,12 +422,15 @@ def create_agent_graph():
 
     # After selecting a task, execute it
     workflow.add_edge("select_next_task", "execute_task")
+
+    # After executing a task, reflect on it
+    workflow.add_edge("execute_task", "reflect")
     
-    # After executing a task, check if there are more tasks to execute.
+    # After reflecting on the status of a task, check if there are more tasks to execute.
     # If there are, select next task.
     # If there aren't, reflect and complete.
     workflow.add_conditional_edges(
-        "execute_task",
+        "reflect",
         has_more_tasks,
         {
             "execute": "select_next_task",
@@ -390,5 +450,36 @@ def create_agent_graph():
 
 
 
+""" Graph visualization """
+
+def visualize_graph(output_path: str = "agent_workflow.png"):
+    """
+    Generate a visualization of the agent workflow graph.
+    
+    Args:
+        output_path (str): Path where the PNG image will be saved
+    
+    Returns:
+        str: Path to the generated image file
+    """
+    try:
+        app = create_agent_graph()
+        
+        # Get the graph visualization as PNG
+        png_data = app.get_graph().draw_mermaid_png()
+        
+        # Save to file
+        with open(output_path, 'wb') as f:
+            f.write(png_data)
+        
+        print(f"✓ Graph visualization saved to: {output_path}")
+        return output_path
+    
+    except Exception as e:
+        print(f"Error generating visualization: {type(e).__name__}: {str(e)}")
+        print("Note: You may need to install additional dependencies:")
+        print("  pip install pygraphviz")
+        print("  or use the ASCII version with print_graph_ascii()")
+        return None
 
 
