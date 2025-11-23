@@ -2,6 +2,7 @@ from langchain_core.tools import tool
 from tavily import TavilyClient
 import os
 import subprocess
+import traceback
 
 @tool
 def web_search(query: str) -> str:
@@ -21,10 +22,22 @@ def web_search(query: str) -> str:
     
     try:
         client = TavilyClient(api_key=api_key)
-        response = client.search(query, max_results=5)
+        response = client.search(query, max_results=3)
+        
+        # Handle response - it should be a dict
+        if not isinstance(response, dict):
+            return f"Unexpected response type from Tavily: {type(response)}"
+        
+        # Get results list
+        results_list = response.get('results', [])
+        if not results_list:
+            return f"No results found for query: '{query}'"
         
         results = []
-        for i, result in enumerate(response.get('results', []), 1):
+        for i, result in enumerate(results_list, 1):
+            if not isinstance(result, dict):
+                continue
+                
             title = result.get('title', 'No title')
             content = result.get('content', 'No description')
             url = result.get('url', '')
@@ -36,12 +49,13 @@ def web_search(query: str) -> str:
             )
         
         if not results:
-            return f"No results found for query: '{query}'"
+            return f"No valid results found for query: '{query}'"
         
         return "\n\n".join(results)
     
     except Exception as e:
-        return f"Search error: {type(e).__name__}: {str(e)}" # TODO: Handle search errors
+        error_details = traceback.format_exc()
+        return f"Search error: {type(e).__name__}: {str(e)}"
 
 
 @tool
@@ -65,6 +79,7 @@ def read_file(file_path: str) -> str:
         return f"Error: Permission denied to read '{file_path}'"
     except Exception as e:
         return f"Error reading file: {type(e).__name__}: {str(e)}"
+
 
 
 @tool
@@ -119,48 +134,5 @@ def append_to_file(file_path: str, content: str) -> str:
         return f"Error appending to file: {type(e).__name__}: {str(e)}"
 
 
-@tool
-def list_files(directory: str = ".") -> str:
-    """
-    List all files and directories in a given directory.
-    
-    Args:
-        directory (str): The directory path to list (default: current directory)
-    
-    Returns:
-        str: Formatted list of files and directories
-    """
-    try:
-        items = os.listdir(directory)
-        if not items:
-            return f"Directory '{directory}' is empty"
-        
-        files = []
-        dirs = []
-        
-        for item in sorted(items):
-            full_path = os.path.join(directory, item)
-            if os.path.isdir(full_path):
-                dirs.append(f"📁 {item}/")
-            else:
-                size = os.path.getsize(full_path)
-                files.append(f"📄 {item} ({size} bytes)")
-        
-        result = f"Contents of '{directory}':\n\n"
-        if dirs:
-            result += "Directories:\n" + "\n".join(dirs) + "\n\n"
-        if files:
-            result += "Files:\n" + "\n".join(files)
-        
-        return result
-    except FileNotFoundError:
-        return f"Error: Directory '{directory}' not found"
-    except PermissionError:
-        return f"Error: Permission denied to access '{directory}'"
-    except Exception as e:
-        return f"Error listing directory: {type(e).__name__}: {str(e)}"
-
-
-
 # List of all available tools for the agent
-AVAILABLE_TOOLS = [web_search, read_file, write_file, append_to_file, list_files]
+AVAILABLE_TOOLS = [web_search, read_file, write_file, append_to_file]

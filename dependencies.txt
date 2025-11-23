@@ -1,7 +1,14 @@
-openai
+# Core LangChain and LangGraph
 langgraph
 langchain-openai
 langchain-core
+
+# LLM Provider
+openai
+
+# Tools and APIs
+tavily-python
 python-dotenv
-colorama
-duckduckgo-search
+
+# Optional: Graph Visualization (requires graphviz system dependency)
+# pygraphviz  

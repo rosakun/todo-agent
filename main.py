@@ -10,6 +10,7 @@ def main():
         return
     
     # Get user's goal
+    print("=" * 50)
     print("+ AI Agent TODO Executor +")
     print("=" * 50)
     
@@ -43,7 +44,12 @@ def main():
     }
     
     # Run the agent
-    config = {"configurable": {"thread_id": "1"}}
+    config = {
+        "configurable": {
+            "thread_id": "1"
+        },
+        "recursion_limit": 100  # Increased from default 25 to allow more tasks
+    }
     #print(f"\nGoal: {goal}\n")
     print("Great! Writing up the to-do list...")
 
