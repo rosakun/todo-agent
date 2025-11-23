@@ -1,6 +1,18 @@
 # todo-agent
 Helpful AI Agent that listens to your goal, produces a to-do list, and then executes that to-do list.
 
+##  Project Structure
+
+```
+todo-agent/
+├── agent.py              # Core agent logic & graph definition
+├── tools.py              # Tool implementations
+├── main.py               # Entry point
+├── tests.py              # Tests
+├── dependencies.txt      # Python dependencies
+├── .env                  # API keys (you have to create this)
+└── README.md            # This file
+```
 
 ## Quick Start
 
@@ -34,40 +46,45 @@ You'll be prompted to:
 1. Choose execution mode. Choose from either "auto" (which runs the to-do list immediately after generation) or "confirm" (which waits for human confirmation before running the to-do list)
 2. Enter your goal. The agent works better when the goal is more specific.
 
-##  How The Loop Works
 
-### The Execution Loop
+##  High-Level Graph Workflow 
 
-The agent follows a **plan-execute-reflect** cycle implemented as a state machine using LangGraph:
+The agent follows a **plan-execute-reflect** cycle implemented as a state machine using LangGraph. 
 
-```
-START
-  ↓
-generate_todos (Planning Phase)
-  ↓
-[Mode Check]
-  ├─ Auto Mode → select_next_task
-  └─ Confirm Mode → display_and_wait_for_approval
-                       ↓
-                   [User approves?]
-                     ├─ Yes → select_next_task
-                     └─ No → END
-  ↓
-EXECUTION LOOP:
-  select_next_task
-    ↓
-  execute_task (with tools)
-    ↓
-  reflect (assess task status)
-    ↓
-  [More pending tasks?]
-    ├─ Yes → select_next_task (loop)
-    └─ No → reflect_and_complete
-              ↓
-            END
+The agent takes as input a high-level goal provided by the user. It first creates a to-do list towards achieving that goal. If the user selected "confirm" mode, then the agent waits for the user's confirmation to begin executing the to-do list. If the user selected "auto" mode, then the agent directly begins executing the to-do list.
+
+The execution loop is as follows. First, the agent selects the next task to execute. It then executes the task using a tool-bound LLM. It then reflects on the status of the task - whether it is completed, failed, or needs follow-up. When all tasks are complete, the agent generates a final summarizing statement and passes it to the user. 
+
+The workflow is visualized here:
+
+![Agent Workflow](images/agent_workflow.png)
+
+
+## Specific Implementation Details
+
+### State Management
+Uses LangGraph's `StateGraph` with `AgentState` TypedDict:
+
+```python
+class AgentState(TypedDict):
+    goal: str                    # User's original goal
+    mode: Literal["confirm", "auto"]
+    tasks: list[Task]            # Generated task list
+    current_task_id: int | None  # Currently executing task
+    conversation_history: list   # Context across tasks
+    output: str | None           # Final result
 ```
 
-### Chat-Planning → Execution Implementation
+###  Available Tools
+
+The agent has access to these tools during execution:
+
+- **`web_search(query)`** - Search the web using Tavily API
+- **`read_file(path)`** - Read file contents
+- **`write_file(path, content)`** - Write or overwrite files
+- **`append_to_file(path, content)`** - Append to existing files
+
+### Specific Step-by-Step Walkthrough of Workflow
 
 #### 1. **Planning Phase** (`generate_todos`)
 - User provides a high-level goal
@@ -75,15 +92,6 @@ EXECUTION LOOP:
 - Uses Pydantic schema validation to ensure proper task format
 - Each task gets: `id`, `title`, `description`, `status` ("pending")
 - Tasks stored in agent state for execution
-
-```python
-class TaskSchema(BaseModel):
-    id: int
-    title: str
-    description: str
-
-# LLM generates: [Task1, Task2, Task3, ...]
-```
 
 #### 2. **Execution Phase** (Loop)
 
@@ -99,36 +107,26 @@ class TaskSchema(BaseModel):
   - Conversation history (context from previous tasks)
   - Available tools
 - LLM can call one or multiple tools to complete task
-- All tool results accumulated and stored
+- All tool results or LLM outputs accumulated and stored
 
 **Reflection** (`reflect`):
 - LLM analyzes task execution result
 - Determines status: `"successful"`, `"failed"`, or `"needs follow-up"`
 - Updates task status to `"complete"`, `"failed"`, or `"needs-follow-up"`
-- Provides brief explanation
+- Provides brief explanation/summary
 
 **Loop Control** (`has_more_tasks`):
 - Checks if any tasks remain with `status == "pending"`
-- If yes → loop back to `select_next_task`
-- If no → move to completion
+- If yes: loop back to `select_next_task`
+- If no: move to completion
 
 #### 3. **Completion Phase** (`reflect_and_complete`)
 - LLM generates final summary based on all task results
 - Outputs comprehensive answer to original goal
 
-## 🛠️ Available Tools
 
-The agent has access to these tools during execution:
 
-- **`web_search(query)`** - Search the web using Tavily API
-- **`read_file(path)`** - Read file contents
-- **`write_file(path, content)`** - Write or overwrite files
-- **`append_to_file(path, content)`** - Append to existing files
-- **`list_files(directory)`** - List directory contents
-- **`execute_python(code)`** - Run Python code snippets (sandboxed)
-- **Math tools** - `add`, `subtract`, `multiply`, `divide`, `power`
-
-## 🎯 Execution Modes
+## Execution Modes
 
 ### Auto Mode (Default)
 - Tasks execute automatically without interruption
@@ -140,117 +138,20 @@ The agent has access to these tools during execution:
 - User can approve or reject
 - Useful for reviewing plan before committing
 
-## 🏗️ Architecture
 
-### State Management
-Uses LangGraph's `StateGraph` with `AgentState` TypedDict:
+## Testing
 
-```python
-class AgentState(TypedDict):
-    goal: str                    # User's original goal
-    mode: Literal["confirm", "auto"]
-    tasks: list[Task]            # Generated task list
-    current_task_id: int | None  # Currently executing task
-    conversation_history: list   # Context across tasks
-    output: str | None           # Final result
-```
+The tests.py file includes tests for:
+- Pydantic schema validation
+- Some of the individual node functions
+- Graph compliation
 
-### Graph Nodes
-- **generate_todos**: LLM planning with structured output
-- **display_and_wait_for_approval**: Human-in-the-loop checkpoint
-- **select_next_task**: Task queue management
-- **execute_task**: Tool-calling execution
-- **reflect**: Post-execution analysis
-- **reflect_and_complete**: Final summarization
+Everything else was tested by running the agent.
 
-### Key Features
-- ✅ **Stateful execution**: Context maintained across all tasks
-- ✅ **Multi-tool support**: Agent can call multiple tools per task
-- ✅ **Self-reflection**: Automatic success/failure detection
-- ✅ **Error handling**: Graceful handling of tool failures
-- ✅ **Configurable limits**: Adjustable recursion limit for complex workflows
-
-## 📁 Project Structure
-
-```
-todo-agent/
-├── agent.py              # Core agent logic & graph definition
-├── tools.py              # Tool implementations
-├── main.py               # Entry point
-├── tests.py              # Unit tests
-├── dependencies.txt      # Python dependencies
-├── .env                  # API keys (create this)
-└── README.md            # This file
-```
-
-## 🔍 Visualizing the Workflow
-
-```python
-from agent import print_graph_ascii
-
-print_graph_ascii()  # Prints workflow diagram
-```
-
-## 🧪 Testing
-
-Run tests:
+In the test file, write the functions you want to test in the '__main__' call and run:
 ```bash
 python tests.py
 ```
 
-Tests include:
-- Pydantic schema validation
-- Graph compilation
-- Individual node functions
-- File operation tools
-- Math tools
-- Web search (if API key present)
 
-## 🔧 Configuration
 
-### Increase Task Limit
-Edit `main.py` to increase recursion limit:
-```python
-config = {
-    "recursion_limit": 100  # Default: allows ~25 tasks
-}
-```
-
-### Change LLM Model
-Edit `agent.py`:
-```python
-llm = ChatOpenAI(model="gpt-4", temperature=0)  # Use GPT-4
-```
-
-## 📝 Example Usage
-
-**Goal**: "Research the latest AI news and create a summary report"
-
-**Generated Tasks**:
-1. Search for latest AI news
-2. Extract key information
-3. Write summary to file
-
-**Execution**:
-- Task 1: Calls `web_search("latest AI news 2025")`
-- Task 2: Calls `execute_python(code to parse results)`
-- Task 3: Calls `write_file("ai_summary.txt", summary)`
-
-**Output**: Summary report saved + final overview
-
-## 🤝 Contributing
-
-Feel free to add new tools in `tools.py`:
-```python
-@tool
-def your_tool(arg: str) -> str:
-    """Tool description for LLM."""
-    # Implementation
-    return result
-
-# Add to AVAILABLE_TOOLS list
-```
-
-## 📄 License
-
-MIT
