@@ -91,6 +91,7 @@ def generate_todos(state: AgentState) -> AgentState:
     
     Each task should represent a single step.
     Each task should be concrete and executable.
+    Avoid steps such as 'record', 'confirm', or 'reflect' unless absolutely necessary.
     """
 
     response = structured_llm.invoke(prompt)
@@ -161,7 +162,9 @@ def execute_task(state: AgentState) -> AgentState:
     Description: {current_task['description']}
     Context: {state['conversation_history']}
     
-    Use the available tools as needed to complete the task."""
+    Use the available tools as needed to complete the task.
+    Do not create files unless absolutely necessary.
+    Put all created files in a 'agent-files/' directory."""
     
     response = llm_with_tools.invoke(task_prompt)
 
@@ -174,14 +177,18 @@ def execute_task(state: AgentState) -> AgentState:
         if tool_func:
             try:
                 result = tool_func.invoke(tool_args)
-                state["conversation_history"].append(f"Tool '{tool_name}' executed with arguments {tool_args}")
-                print(f"Tool '{tool_name}' executed with arguments {tool_args}")
+                if tool_args > 100:
+                    state["conversation_history"].append(f"Tool '{tool_name}' executed.")
+                    print(f"Tool '{tool_name}' executed.\n")
+                else:
+                    state["conversation_history"].append(f"Tool '{tool_name}' executed with arguments {tool_args}")
+                    print(f"Tool '{tool_name}' executed with arguments {tool_args}")
                 current_task['result'] = str(result)
                 state["conversation_history"].append(f"Result: {current_task['result']}") # TODO: Update for case where result is None, for instance tool call creates a file. (Maybe they should all return strings)
                 print(f"Result: {current_task['result']}\n")
                 current_task['status'] = "complete"
             except Exception as e:
-                print(f"Tool execution failed: {e}") # TODO: Maybe this should be added to conversation history? 
+                print(f"Tool {tool_name}execution failed: {e}") # TODO: Maybe this should be added to conversation history? 
                 task_failed = True
         else:
             print(f"Tool '{tool_name}' not found in AVAILABLE_TOOLS")
@@ -237,7 +244,6 @@ def reflect_and_complete(state: AgentState) -> AgentState:
     state["output"] = response.content
 
     return state
-
 
 
 

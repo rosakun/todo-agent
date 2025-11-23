@@ -1,0 +1,172 @@
+/* styles.css - Responsive layout for a small site about differential privacy
+   Mobile-first, accessible, and easy to adapt.
+
+   Palette & design choices:
+   - Readable sans-serif: Inter (use a Google Fonts link in the HTML) with system fallbacks
+   - Neutral light background, dark text, navy primary, teal accent
+   - CSS variables for quick theming
+*/
+
+:root{
+  /* color palette */
+  --bg: #f7f9fb;
+  --surface: #ffffff;
+  --text: #0f1720; /* near-black for contrast */
+  --muted: #52606d; /* secondary text */
+  --primary: #0b4f6c; /* deep teal/blue */
+  --accent: #17a2a9; /* bright teal */
+  --accent-2: #ffb86b; /* warm highlight */
+  --border: #e6eef3;
+
+  /* layout */
+  --max-width: 1100px;
+  --gutter: 1rem;
+
+  /* type */
+  --base-size: 16px;
+  --radius: 8px;
+}
+
+/* Global resets & base styles */
+*{box-sizing:border-box}
+html{font-size:var(--base-size); -webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background:var(--bg);
+  color:var(--text);
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+
+a{color:var(--primary); text-decoration:none}
+a:focus, a:hover{text-decoration:underline}
+
+img{max-width:100%;height:auto;display:block}
+
+.container{
+  width:100%;
+  margin:0 auto;
+  padding:0 var(--gutter);
+  max-width:var(--max-width);
+}
+
+/* Header */
+.site-header{
+  background:linear-gradient(180deg, rgba(11,79,108,0.05), transparent 60%);
+  border-bottom:1px solid var(--border);
+}
+.header-inner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:1rem;
+  padding:1rem 0;
+}
+.site-title{
+  font-size:1.125rem;
+  font-weight:700;
+  color:var(--primary);
+  margin:0;
+}
+.site-tagline{
+  font-size:0.9rem;
+  color:var(--muted);
+  margin-left:0.5rem;
+  font-weight:500;
+}
+
+/* Navigation - mobile first (stacked) */
+.site-nav{
+  margin-top:0.75rem;
+}
+.site-nav ul{
+  list-style:none;
+  padding:0;
+  margin:0;
+  display:flex;
+  flex-direction:column;
+  gap:0.5rem;
+}
+.site-nav a{
+  display:inline-block;
+  padding:0.5rem 0.6rem;
+  color:var(--primary);
+  border-radius:6px;
+}
+.site-nav a:hover, .site-nav a:focus{
+  background:rgba(23,162,169,0.06);
+}
+
+/* Main layout: single column on mobile, grid on larger screens */
+.site-main{
+  padding:1.25rem 0 2rem;
+}
+.main-grid{
+  display:block;
+}
+.article{
+  background:var(--surface);
+  border:1px solid var(--border);
+  padding:1rem;
+  border-radius:var(--radius);
+  box-shadow:0 1px 2px rgba(15,23,32,0.03);
+}
+.sidebar{
+  margin-top:1rem;
+  background:linear-gradient(180deg, rgba(255,184,107,0.05), transparent 60%);
+  padding:0.75rem;
+  border-radius:8px;
+  border:1px dashed rgba(11,79,108,0.06);
+  color:var(--muted);
+  font-size:0.95rem;
+}
+
+/* Footer */
+.site-footer{
+  padding:1rem 0;
+  border-top:1px solid var(--border);
+  color:var(--muted);
+  font-size:0.9rem;
+}
+
+/* Utility classes */
+.lead{font-size:1.05rem;color:var(--muted)}
+.kicker{font-weight:700;color:var(--accent)}
+.row{display:flex;gap:1rem}
+.card{background:var(--surface);padding:0.75rem;border-radius:8px;border:1px solid var(--border)}
+
+/* Responsive rules: breakpoint at 768px */
+@media (min-width: 48rem){
+  .header-inner{padding:1.25rem 0}
+  .site-header{padding:0 0 0.25rem}
+  .site-nav ul{flex-direction:row}
+  .site-nav a{padding:0.5rem 0.9rem}
+
+  .main-grid{
+    display:grid;
+    grid-template-columns: 1fr 320px; /* main content + sidebar */
+    gap:1.25rem;
+    align-items:start;
+  }
+  .sidebar{margin-top:0}
+}
+
+/* Larger screens: increase content width and subtle changes */
+@media (min-width: 90rem){
+  :root{--max-width:1300px}
+  .site-title{font-size:1.25rem}
+}
+
+/* Accessibility: focus outlines */
+button:focus, a:focus{outline:3px solid rgba(23,162,169,0.15);outline-offset:3px}
+
+/* Small helpers for tables and lists */
+.table{width:100%;border-collapse:collapse}
+.table th, .table td{padding:0.5rem;border-bottom:1px solid var(--border);text-align:left}
+
+/* Print-friendly tweaks */
+@media print{
+  body{background:#fff;color:#000}
+  .site-header, .site-footer{display:none}
+}

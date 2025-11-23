@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420" role="img" aria-labelledby="title desc">
+  <title id="title">Differential privacy diagram: noise added to query results and privacy-accuracy tradeoff</title>
+  <desc id="desc">Left: a simple database and a query returning a true count. Middle: Laplace noise sampled and added to the true value producing a noisy answer. Right: a small chart illustrating the privacy-accuracy tradeoff (epsilon small -> more noise -> less accuracy; epsilon large -> less noise -> more accuracy).</desc>
+
+  <!-- Background -->
+  <rect width="100%" height="100%" fill="#f6f8fb"/>
+
+  <!-- Database illustration -->
+  <g transform="translate(30,30)">
+    <rect x="0" y="0" width="220" height="180" rx="8" fill="#ffffff" stroke="#cdd6e0"/>
+    <text x="12" y="22" font-family="Arial" font-size="14" fill="#223">Database</text>
+
+    <!-- rows -->
+    <g fill="#e9f0ff" stroke="#c7daf9">
+      <rect x="12" y="36" width="196" height="18" rx="4"/>
+      <rect x="12" y="60" width="196" height="18" rx="4"/>
+      <rect x="12" y="84" width="196" height="18" rx="4"/>
+      <rect x="12" y="108" width="196" height="18" rx="4"/>
+      <rect x="12" y="132" width="196" height="18" rx="4"/>
+    </g>
+
+    <text x="12" y="170" font-family="Arial" font-size="12" fill="#445">Many records (sensitive data)</text>
+  </g>
+
+  <!-- Query and true answer -->
+  <g transform="translate(270,30)">
+    <rect x="0" y="0" width="200" height="120" rx="8" fill="#fff" stroke="#cdd6e0"/>
+    <text x="12" y="22" font-family="Arial" font-size="14" fill="#223">Query</text>
+    <text x="12" y="48" font-family="Arial" font-size="12" fill="#223">Count of people with Condition X</text>
+
+    <g transform="translate(12,68)">
+      <rect x="0" y="0" width="176" height="36" rx="6" fill="#fff7e6" stroke="#f0d9b3"/>
+      <text x="12" y="22" font-family="Arial" font-size="14" fill="#7a4b00">True answer: 42</text>
+    </g>
+  </g>
+
+  <!-- Arrow to noise -->
+  <g transform="translate(470,60)">
+    <path d="M-40 30 L0 30" stroke="#667" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+  </g>
+
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#667"/>
+    </marker>
+  </defs>
+
+  <!-- Noise sampling -->
+  <g transform="translate(520,10)">
+    <rect x="0" y="0" width="340" height="200" rx="8" fill="#fff" stroke="#cdd6e0"/>
+    <text x="12" y="22" font-family="Arial" font-size="14" fill="#223">Noise (Laplace distribution sample)</text>
+
+    <!-- Laplace-like distribution curve (stylized) -->
+    <g transform="translate(20,50)">
+      <path d="M0 60 C20 40 40 20 60 20 C80 20 100 40 120 60 C140 80 160 100 180 60" stroke="#4a90e2" stroke-width="3" fill="none"/>
+      <line x1="90" y1="0" x2="90" y2="120" stroke="#d6d6d6" stroke-dasharray="3,3"/>
+      <text x="84" y="-6" font-family="Arial" font-size="10" fill="#445">0</text>
+
+      <!-- sample point -->
+      <circle cx="120" cy="60" r="6" fill="#ff6b6b" stroke="#c94"/>
+      <text x="130" y="60" font-family="Arial" font-size="12" fill="#333">noise = +3</text>
+    </g>
+
+    <text x="16" y="150" font-family="Arial" font-size="12" fill="#334">Random noise is sampled and added to the true answer</text>
+  </g>
+
+  <!-- Result box -->
+  <g transform="translate(270,170)">
+    <rect x="0" y="0" width="200" height="90" rx="8" fill="#ffffff" stroke="#cdd6e0"/>
+    <text x="12" y="24" font-family="Arial" font-size="14" fill="#223">Released (noisy) answer</text>
+    <g transform="translate(12,36)">
+      <rect x="0" y="0" width="176" height="36" rx="6" fill="#effaf0" stroke="#c8e9d1"/>
+      <text x="12" y="22" font-family="Arial" font-size="14" fill="#117a3a">Noisy answer: 45 (42 + 3)</text>
+    </g>
+  </g>
+
+  <!-- Privacy-accuracy tradeoff chart -->
+  <g transform="translate(520,220)">
+    <rect x="0" y="0" width="340" height="160" rx="8" fill="#fff" stroke="#cdd6e0"/>
+    <text x="12" y="22" font-family="Arial" font-size="14" fill="#223">Privacy vs Accuracy (informal)</text>
+
+    <!-- axes -->
+    <g transform="translate(38,38)">
+      <line x1="0" y1="100" x2="260" y2="100" stroke="#999"/>
+      <line x1="0" y1="100" x2="0" y2="0" stroke="#999"/>
+      <text x="-6" y="-6" font-family="Arial" font-size="10" fill="#445">Accuracy</text>
+      <text x="240" y="116" font-family="Arial" font-size="10" fill="#445">Epsilon (privacy)</text>
+
+      <!-- curve: accuracy increases with epsilon -->
+      <path d="M10 90 C60 70 140 40 250 20" stroke="#ff8c42" stroke-width="3" fill="none"/>
+
+      <!-- labels for small and large epsilon -->
+      <text x="20" y="105" font-family="Arial" font-size="10" fill="#333">small ε → strong privacy</text>
+      <text x="170" y="105" font-family="Arial" font-size="10" fill="#333">large ε → weaker privacy</text>
+    </g>
+  </g>
+
+  <!-- Footer explanation -->
+  <text x="30" y="360" font-family="Arial" font-size="13" fill="#333">Key idea: Differential privacy adds carefully calibrated random noise to query outputs so individual records are protected. Smaller ε means more noise (better privacy, less accuracy).</text>
+
+</svg>
