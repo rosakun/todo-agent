@@ -71,6 +71,7 @@ class AgentState(TypedDict):
     mode: Literal["confirm", "auto"]
     tasks: list[Task]            # Generated task list
     current_task_id: int | None  # Currently executing task
+    approved: bool               # 'True' when the user has approved the to-do list in 'confirm' mode
     conversation_history: list   # Context across tasks
     output: str | None           # Final result
 ```
